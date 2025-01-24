@@ -1,0 +1,7 @@
+*.xml
+process/
+txt/
+.DS_Store
+.venv
+.vscode
+__pycache__
