@@ -15,7 +15,7 @@ Wikipedia dumps, even those containing only revision for each article, are large
 
 ### Levels
 
-Wikipedia moderators compile and maintain a [5 level "vital article" list]((https://en.wikipedia.org/wiki/Wikipedia:Vital_articles)) that categorizes articles by how fundamental their inclusion is in a wiki. This list allows for users to have control over the size of their knowledge base. Below is a table describing the distribution of data by level:
+Wikipedia moderators compile and maintain a [5 level "vital article" list](https://en.wikipedia.org/wiki/Wikipedia:Vital_articles) that categorizes articles by how fundamental their inclusion is in a wiki. This list allows for users to have control over the size of their knowledge base. Below is a table describing the distribution of data by level:
 
 | Level | Number of Articles |
 | ----- | ------------------ |
@@ -70,6 +70,8 @@ If you don't know what embedding is and just want a way to ground your LLM respo
 3) Make your way to `Workspace` > `Knowledge` > `+`. Choose a title and description.
 4) Upload your `output` directory.
 5) Wait. Embedding thousands of documents may take quite some time.
+
+To see my detailed guide on setting up Open WebUI with other components for a complete LLM server, click [here](https://github.com/varunvasudeva1/llm-server-docs).
 
 > [!TIP]
 > To strike a balance between efficiency of embedding and size of knowledge base, (GL = 3, SL = 4) or (GL = 4, SL = 5) is recommended. This will let your KB be complete enough to be very useful and not so large that embedding and uploading takes forever.
