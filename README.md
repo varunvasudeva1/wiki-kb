@@ -1,4 +1,4 @@
-# WikiKB: Embedding-ready offline knowledge base
+# Wiki KB: Customizable, embedding-ready knowledge base
 
 This repository contains a set of scripts designed to convert desired articles from a Wikipedia XML dump into plain text formatted files, making them suitable for building embedded model knowledge bases. Knowledge bases like this can enable retrieval-augmented generation (RAG), making it possible to increase recall accuracy and prevent hallucinations in language models. Combined with reasoning models, it is a potent combination that opens the door to assistants that have the ability to perform competent reasoning with real-world information.
 
@@ -15,7 +15,7 @@ Wikipedia dumps, even those containing only revision for each article, are large
 
 ### Levels
 
-Wikipedia moderators compile and maintain a 5 level list containing article names that rank articles, subjectively, by how fundamental their inclusion is in a wiki. This allows for users to have control over the size of their knowledge base. Below is a table describing the distribution of data by level:
+Wikipedia moderators compile and maintain a [5 level "vital article" list]((https://en.wikipedia.org/wiki/Wikipedia:Vital_articles)) that categorizes articles by how fundamental their inclusion is in a wiki. This list allows for users to have control over the size of their knowledge base. Below is a table describing the distribution of data by level:
 
 | Level | Number of Articles |
 | ----- | ------------------ |
@@ -25,36 +25,54 @@ Wikipedia moderators compile and maintain a 5 level list containing article name
 | 4     | 10000              |
 | 5     | 50000              |
 
-Select a level that will capture the kind of querying you want to do with your wiki. If you/your users ask language models a lot random questions that needed to be factually accurate, a level 4 or 5 would be a better option for you. In contrast, if you have a need to query information from mostly one domain (e.g. mathematics, physics, economics, etc.), a level 3 with a separate injection of domain-specific data might be a better idea. This would effectively translate to the generality of level 3 with the specificity of a level 5 for a given topic.
-
-> [!TIP]
-> To strike a balance between efficiency of embedding and size of knowledge base, level 4 is recommended.
+Inspired by Einstein's approach to organizing knowledge, we break down Wikipedia articles into two distinct categories: general and special. The general level encompasses the foundational articles that form the broad base of your knowledge base (KB), ensuring it contains essential information across various domains. Meanwhile, the special level focuses on in-depth coverage of specific topics you choose, allowing for highly customized and comprehensive knowledge without sacrificing the core utility of your KB.
 
 ## Installation
 
 Run the following script to clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/varunvasudeva1/wiki-kb
+git clone https://github.com/varunvasudeva1/wiki-kb.git
 cd wiki-kb
-python -m venv -n .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 
 ## Usage
 
 1) Download your Wikipedia dump of choice from [here](https://meta.wikimedia.org/wiki/Data_dump_torrents). A torrent download is recommended.
 2) Uncompress the `.bz2` result to obtain an `.xml` file (warning: depending on the device you run this action on, it may take some time). Place this at the root of the `wiki-kb` directory.
-3) Configure options in `config.json`: level.
+3) Configure options in `config.json`.
 4) Run the script:
     ```bash
     python main.py
     ```
 
-### Example Output
+### `config.json`
 
-The converted articles will be saved as individual `.txt` files in the `output/` directory. Each file will contain the full text of a single Wikipedia article, cleaned of markup and formatting.
+- `data_filename`: Filename of the XML containing articles.
+- `general_level`: The desired level for your KB's general knowledge. Set value between 1 and 5.
+- `special_level`: The desired level for your KB's specialized knowledge in select few topics. Set value between 1 and 5 or `null` if no specialized knowledge topics are needed. Value must be greater than `general_level`.
+- `special_level_topics`: The topics that the special level applies to. Set to `[]` if no specialized knowledge topics are needed.
+
+### Embedding
+
+To utilize your KB with language models, the resulting text outputs will need to be embedded by an embedding model so that language models can use them before providing answers. If you're using a custom RAG pipeline, you probably don't need to read this section anyway. 
+
+If you don't know what embedding is and just want a way to ground your LLM responses, follow these steps to build your embedded KB:
+
+1) Install [Open WebUI](https://github.com/open-webui/open-webui).
+2) Navigate to `Admin Settings` > `Documents`. 
+   - Select between `Ollama` and `OpenAI`. If `Ollama`, set the appropriate embedding model. For a good model that balances runtime and performance, run `ollama pull nomic-embed-text` from a terminal and then select it as the `Embedding Model`.
+   - Crank `Embedding Batch Size` to the maximum of `8192`.
+   - Save your configuration.
+3) Make your way to `Workspace` > `Knowledge` > `+`. Choose a title and description.
+4) Upload your `output` directory.
+5) Wait. Embedding thousands of documents may take quite some time.
+
+> [!TIP]
+> To strike a balance between efficiency of embedding and size of knowledge base, (GL = 3, SL = 4) or (GL = 4, SL = 5) is recommended. This will let your KB be complete enough to be very useful and not so large that embedding and uploading takes forever.
 
 ## Contributing
 

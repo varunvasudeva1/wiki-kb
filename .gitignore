@@ -1,5 +1,6 @@
 *.xml
 process/
+output/
 txt/
 .DS_Store
 .venv

@@ -1,3 +1,6 @@
 {
-  "level": 3
+  "data_filename": "enwiki-20241201-pages-articles-multistream.xml",
+  "general_level": 4,
+  "special_level": 5,
+  "special_level_topics": ["Mathematics"]
 }

@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 from bs4 import BeautifulSoup, Tag
 import time
@@ -12,15 +13,33 @@ logging.basicConfig(
 
 PROCESS_DIR = "process"
 BASE_URL = "https://en.wikipedia.org"
-LEVEL = 4
 
 
-def get_subpages():
+def load_config():
+    with open("config.json", "r+") as file:
+        config = json.load(file)
+    return config
+
+
+def is_config_valid():
+    config = load_config()
+    if config["special_level"] <= config["general_level"]:
+        return False
+    if config["special_level"] != None:
+        if config["special_level_topics"] == []:
+            return False
+
+    return True
+
+
+def get_subpages(mode):
     """
     Fetches the vital articles page and extracts all subpage links for a given level.
     Returns a set of URLs pointing to each subpage.
     """
-    sub_url = f"/wiki/Wikipedia:Vital_articles/Level/{LEVEL}/"
+    config = load_config()
+    level = config[f"{mode}_level"]
+    sub_url = f"/wiki/Wikipedia:Vital_articles/Level/{level}/"
     main_url = urljoin(BASE_URL, sub_url)
 
     try:
@@ -38,8 +57,13 @@ def get_subpages():
         if sub_url in link["href"]:
             full_url = urljoin(BASE_URL, link["href"])
             # Only get those pages where something follows /, i.e., Level/4/People or Level/4/Arts
-            if full_url.split("/")[-1] != "" and "Current_total" not in full_url:
-                subpages.add(full_url)
+            topic = full_url.split("/")[-1]
+            if topic != "" and "Current_total" not in full_url:
+                if mode == "special":
+                    if topic.replace(" ", "_") in config["special_level_topics"]:
+                        subpages.add(full_url)
+                else:
+                    subpages.add(full_url)
 
     return subpages
 
@@ -93,27 +117,34 @@ def get_articles():
     """
     logging.info("Starting extraction process.")
     os.makedirs(PROCESS_DIR, exist_ok=True)
+    if not is_config_valid():
+        logging.error(
+            "Invalid configuration file found. Please ensure `general_level` < `special_level` and, if `special_level` is not null, there is a valid list for `special_level_topics`."
+        )
+        return
 
-    subpages = get_subpages()
-    logging.info(f"Found {len(subpages)} subpages: {subpages}")
+    for mode in ["general", "special"]:
+        logging.info(f"Getting {mode} articles.")
+        subpages = get_subpages(mode)
+        logging.info(f"Found {len(subpages)} subpages: {subpages}")
 
-    all_articles = set()
+        all_articles = set()
 
-    for url in subpages:
-        logging.info(f"Processing: {url}")
-        try:
-            articles = extract_article_names(url)
-            all_articles.update(articles)
-            time.sleep(0.5)  # Be polite and don't overload the server
-        except Exception as e:
-            logging.error(f"Error processing {url}: {e}")
+        for url in subpages:
+            logging.info(f"Processing: {url}")
+            try:
+                articles = extract_article_names(url)
+                all_articles.update(articles)
+                time.sleep(0.5)  # Be polite and don't overload the server
+            except Exception as e:
+                logging.error(f"Error processing {url}: {e}")
 
-    # Save results to file
-    with open(os.path.join(PROCESS_DIR, "desired_articles.txt"), "w") as f:
-        for article in sorted(all_articles):
-            f.write(article + "\n")
+        # Save results to file
+        with open(os.path.join(PROCESS_DIR, f"{mode}_articles.txt"), "w") as f:
+            for article in sorted(all_articles):
+                f.write(article + "\n")
 
-    logging.info(f"Saved {len(all_articles)} unique articles.")
+        logging.info(f"Saved {len(all_articles)} unique articles.")
 
 
 if __name__ == "__main__":
