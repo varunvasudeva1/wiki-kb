@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -32,15 +33,12 @@ def is_config_valid():
     return True
 
 
-def get_subpages(mode):
+def get_subpages(mode, level, main_url):
     """
     Fetches the vital articles page and extracts all subpage links for a given level.
     Returns a set of URLs pointing to each subpage.
     """
     config = load_config()
-    level = config[f"{mode}_level"]
-    sub_url = f"/wiki/Wikipedia:Vital_articles/Level/{level}/"
-    main_url = urljoin(BASE_URL, sub_url)
 
     try:
         response = requests.get(main_url)
@@ -53,25 +51,57 @@ def get_subpages(mode):
 
     # Find all subpages under the specified level
     subpages = set()
+    special_level_topics: list[str] = config["special_level_topics"]
+    if special_level_topics == None or len(special_level_topics) == 0:
+        logging.error(
+            "Special level found but no associated special level topics found. Please specify some topics and re-run the script."
+        )
+        return set()
+
+    special_level_topics: list[str] = [
+        topic.replace(" ", "_") for topic in special_level_topics
+    ]
     for link in soup.find_all("a", href=True):
-        if sub_url in link["href"]:
-            full_url = urljoin(BASE_URL, link["href"])
-            # Only get those pages where something follows /, i.e., Level/4/People or Level/4/Arts
-            topic = full_url.split("/")[-1]
-            if topic != "" and "Current_total" not in full_url:
-                if mode == "special":
-                    if topic.replace(" ", "_") in config["special_level_topics"]:
-                        subpages.add(full_url)
-                else:
+        full_url = urljoin(BASE_URL, link["href"])
+
+        # Only get those pages where something follows /, i.e., Level/4/People or Level/4/Arts
+        def extract_topic(text):
+            """
+            Extracts everything after "Level/{some number}/" from a string using regex.
+
+            Args:
+                text: The input string to search within.
+
+            Returns:
+                The string found after "Level/{some number}/", or None if the pattern is not found.
+            """
+            pattern = r"Level/\d+/(.*)"  # Regex pattern: Level/digits/(capture everything after)
+            match = re.search(pattern, text)
+            if match:
+                return match.group(1)  # Return the content of the first capturing group
+            else:
+                return None  # Return None if no match is found
+
+        level_string = f"Level/{level}"
+        topic = extract_topic(full_url)
+        if (
+            topic != None
+            and topic != ""
+            and "Current_total" not in full_url
+            and level_string in full_url
+        ):
+            if mode == "special":
+                if topic in special_level_topics:
                     subpages.add(full_url)
+            else:
+                subpages.add(full_url)
 
     return subpages
 
 
-def extract_article_names(url):
+def extract_article_names(url, level):
     """
     Visits a given URL and extracts only the article names from <a> tags.
-    Specifically designed to handle nested links like your example.
     Returns a set of unique article names.
     """
     try:
@@ -90,7 +120,21 @@ def extract_article_names(url):
 
     all_articles = set()  # Use a set to avoid duplicates
 
-    if isinstance(content, Tag):
+    if not isinstance(content, Tag):
+        logging.error(
+            "Content was not traversable. The link being parsed is not of the correct schema, please report it to the author."
+        )
+        return set()
+
+    if level <= 3:
+        # For levels 3 and below, extract <a> links from within tables
+        tables = content.find_all("table")
+        for table in tables:
+            for link in table.find_all("a", href=True):
+                article_text = link.get_text(strip=True)
+                all_articles.add(article_text)
+    else:
+        # For levels 4 and 5, extract innermost <a> links nested within <ol> tags
         for ol in content.find_all("ol"):
             for li in ol.find_all("li"):
                 # Look for direct child anchor tags
@@ -123,21 +167,35 @@ def get_articles():
         )
         return
 
+    config = load_config()
+    all_articles = set()
+
     for mode in ["general", "special"]:
+        # for mode in ["general"]:
         logging.info(f"Getting {mode} articles.")
-        subpages = get_subpages(mode)
-        logging.info(f"Found {len(subpages)} subpages: {subpages}")
-
-        all_articles = set()
-
-        for url in subpages:
-            logging.info(f"Processing: {url}")
+        level = config[f"{mode}_level"]
+        sub_url = f"/wiki/Wikipedia:Vital_articles/Level/{level}"
+        main_url = urljoin(BASE_URL, sub_url)
+        if level <= 3:
+            logging.info(f"Processing: {main_url}")
             try:
-                articles = extract_article_names(url)
+                articles = extract_article_names(main_url, level)
                 all_articles.update(articles)
-                time.sleep(0.5)  # Be polite and don't overload the server
+                time.sleep(0.5)
             except Exception as e:
-                logging.error(f"Error processing {url}: {e}")
+                logging.error(f"Error processing {main_url}: {e}")
+        else:
+            subpages = get_subpages(mode, level, main_url)
+            logging.info(f"Found {len(subpages)} subpages: {subpages}")
+
+            for url in subpages:
+                logging.info(f"Processing: {url}")
+                try:
+                    articles = extract_article_names(url, level)
+                    all_articles.update(articles)
+                    time.sleep(0.5)
+                except Exception as e:
+                    logging.error(f"Error processing {url}: {e}")
 
         # Save results to file
         with open(os.path.join(PROCESS_DIR, f"{mode}_articles.txt"), "w") as f:
